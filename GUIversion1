@@ -1,0 +1,71 @@
+import subprocess
+import tkinter as tk
+from tkinter import scrolledtext
+import random
+
+
+# Function to generate random non-blinding bright colors for night theme
+def random_bright_color():
+    r = random.randint(150, 255)
+    g = random.randint(150, 255)
+    b = random.randint(150, 255)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+# Function to execute PowerShell command and display output
+def show_wifi_passwords():
+    # PowerShell command to get Wi-Fi profiles and passwords
+    ps_command = '''
+    $profiles = netsh wlan show profiles;
+    $profileNames = ($profiles | Select-String "All User Profile" | ForEach-Object { ($_ -split ":")[1].Trim() });
+    foreach ($name in $profileNames) {
+        Write-Host "Profile: $name";
+        netsh wlan show profile name=$name key=clear | Select-String "Key Content"
+    }
+    '''
+
+    # Run the PowerShell command and capture the output
+    process = subprocess.Popen(["powershell", "-Command", ps_command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+
+    # Clear previous text
+    output_text.delete(1.0, tk.END)
+
+    # Check for errors
+    if error:
+        output_text.insert(tk.END, "Error occurred:\n" + error.decode() + "\n")
+        return
+
+    # Split the output by lines and process each line
+    output_lines = output.decode().splitlines()
+    current_color = random_bright_color()  # Start with a random bright color
+
+    for line in output_lines:
+        if "Profile:" in line:
+            # Change color for new profile
+            current_color = random_bright_color()
+            wifi_name = line.replace("Profile:", "").strip()
+            output_text.insert(tk.END, f"Wi-Fi: {wifi_name}\n", (wifi_name,))
+            output_text.tag_config(wifi_name, foreground=current_color)
+        elif "Key Content" in line:
+            password = line.replace("Key Content            :", "").strip()
+            output_text.insert(tk.END, f"Password: {password}\n", (wifi_name,))
+
+
+# Create the main window with a dark theme
+root = tk.Tk()
+root.title("Wi-Fi Passwords Viewer - Night Mode")
+root.geometry("600x400")
+root.configure(bg="black")  # Set background to black
+
+# Create a button with a dark background
+btn = tk.Button(root, text="Show Wi-Fi Passwords", command=show_wifi_passwords, bg="gray", fg="white")
+btn.pack(pady=10)
+
+# Create a scrolled text widget to display the output with night theme
+output_text = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=70, height=20, bg="black", fg="white",
+                                        insertbackground="white")
+output_text.pack(pady=10)
+
+# Start the main loop
+root.mainloop()
